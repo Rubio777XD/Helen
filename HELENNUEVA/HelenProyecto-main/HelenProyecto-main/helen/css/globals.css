@@ -700,6 +700,78 @@ body::after{
   opacity: var(--ambient-opacity); /* por si antes estaba muy bajo */
 }
 
+/* ===================== ACTIVATION RING ====================== */
+.activation-ring{
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 999;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity .35s ease;
+}
+
+.activation-ring::before,
+.activation-ring::after{
+  content: '';
+  border-radius: 50%;
+  display: block;
+  animation-play-state: paused;
+  will-change: transform, opacity;
+}
+
+.activation-ring::before{
+  width: min(82vmin, 680px);
+  height: min(82vmin, 680px);
+  background: conic-gradient(from 45deg, #4cc9f0, #a855f7 25%, #f97316 50%, #facc15 75%, #4cc9f0 100%);
+  mix-blend-mode: screen;
+  box-shadow: 0 0 60px rgba(76,201,240,.35), 0 0 140px rgba(168,85,247,.25);
+  mask: radial-gradient(farthest-side, rgba(0,0,0,0) calc(50% - 10px), rgba(0,0,0,.95) calc(50% - 3px), rgba(0,0,0,0) 76%);
+  -webkit-mask: radial-gradient(farthest-side, rgba(0,0,0,0) calc(50% - 10px), rgba(0,0,0,.95) calc(50% - 3px), rgba(0,0,0,0) 76%);
+  animation: activationRingPulse 2.4s ease-out forwards, activationRingHue 2.4s linear infinite;
+}
+
+.activation-ring::after{
+  width: min(108vmin, 820px);
+  height: min(108vmin, 820px);
+  background: radial-gradient(circle, rgba(76,201,240,.32), rgba(12,26,45,0) 70%);
+  filter: blur(14px);
+  opacity: 0;
+  animation: activationRingGlow 2.4s ease-out forwards;
+}
+
+.activation-ring.is-visible{
+  opacity: 1;
+}
+
+.activation-ring.is-visible::before,
+.activation-ring.is-visible::after{
+  animation-play-state: running;
+}
+
+@keyframes activationRingPulse{
+  0%{ transform: scale(.6); opacity: 0; }
+  18%{ opacity: 1; }
+  65%{ opacity: .85; }
+  100%{ transform: scale(1.05); opacity: 0; }
+}
+
+@keyframes activationRingGlow{
+  0%{ opacity: 0; transform: scale(.6); }
+  30%{ opacity: .5; }
+  100%{ opacity: 0; transform: scale(1.18); }
+}
+
+@keyframes activationRingHue{
+  from{ transform: rotate(0deg); }
+  to{ transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .activation-ring{ display: none !important; }
+}
+
 /* 3) Si el sistema tiene “reduce motion”, se desactiva…  */
 @media (prefers-reduced-motion: reduce){
   body::before,

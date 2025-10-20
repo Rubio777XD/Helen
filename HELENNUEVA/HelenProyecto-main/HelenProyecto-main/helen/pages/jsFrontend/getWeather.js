@@ -4,7 +4,6 @@
 
 // ---------- Config ----------
 const CONFIG = {
-  API_KEY: '6266f75957014a7de4ae0ded34d1e7cc',
   STORAGE_KEY: 'selectedCity',
   DEFAULT_CITY: 'tijuana',
   UPDATE_INTERVAL: 60_000,
@@ -12,6 +11,8 @@ const CONFIG = {
   WEATHER_UNITS: 'metric',
   WEATHER_LANG: 'es',
 };
+
+const API_BASE = window.API_BASE_URL || 'http://127.0.0.1:5000';
 
 // ---------- Municipios BC ----------
 const BC_MUNICIPIOS = {
@@ -158,9 +159,14 @@ class WeatherApp {
   // --- API: actual + daily (5d/3h) ---
   async getWeather(lat, lon){
     // actual
-    const urlNow = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${CONFIG.API_KEY}&units=${CONFIG.WEATHER_UNITS}&lang=${CONFIG.WEATHER_LANG}`;
-    const res = await axios.get(urlNow);
-    const d = res.data;
+    const { data: d } = await axios.get(`${API_BASE}/api/weather/current`, {
+      params: {
+        lat,
+        lon,
+        units: CONFIG.WEATHER_UNITS,
+        lang: CONFIG.WEATHER_LANG,
+      }
+    });
 
     // ciudad
     let city = d.name, country = d.sys?.country || '';
@@ -191,9 +197,10 @@ class WeatherApp {
 
   async getReverseGeocoding(lat, lon){
     try{
-      const url = `https://api.openweathermap.org/geo/1.0/reverse?lat=${lat}&lon=${lon}&limit=1&appid=${CONFIG.API_KEY}`;
-      const {data} = await axios.get(url);
-      if(data && data.length){
+      const {data} = await axios.get(`${API_BASE}/api/weather/reverse-geocoding`, {
+        params: { lat, lon, limit: 1 }
+      });
+      if(Array.isArray(data) && data.length){
         return {name: data[0].name, country: data[0].country};
       }
     }catch{}
@@ -221,8 +228,14 @@ class WeatherApp {
 
   // --- Daily usando feed 5d/3h (1 muestra por día, ~mediodía) ---
   async getDailyFrom3h(lat, lon){
-    const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${CONFIG.API_KEY}&units=${CONFIG.WEATHER_UNITS}&lang=${CONFIG.WEATHER_LANG}`;
-    const {data} = await axios.get(url);
+    const {data} = await axios.get(`${API_BASE}/api/weather/forecast`, {
+      params: {
+        lat,
+        lon,
+        units: CONFIG.WEATHER_UNITS,
+        lang: CONFIG.WEATHER_LANG,
+      }
+    });
 
     const tz = data.city?.timezone ?? 0;
     const items = data.list || [];
@@ -271,57 +284,38 @@ class WeatherApp {
     });
   }
 
-  // --- Próximas horas (One Call 3.0 -> fallback 3h) ---
+  // --- Próximas horas (usando feed 3h del backend) ---
   async getTodayHourlyForecast(lat, lon){
-    // 1) intentar One Call 3.0
     try{
-      const url = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lon}&appid=${CONFIG.API_KEY}&units=${CONFIG.WEATHER_UNITS}&lang=${CONFIG.WEATHER_LANG}&exclude=minutely,daily,alerts`;
-      const {data} = await axios.get(url);
+      const {data} = await axios.get(`${API_BASE}/api/weather/forecast`, {
+        params: {
+          lat,
+          lon,
+          units: CONFIG.WEATHER_UNITS,
+          lang: CONFIG.WEATHER_LANG,
+        }
+      });
 
-      const tz = data.timezone_offset ?? 0;
+      const tz = data.city?.timezone ?? 0;
       const now = WeatherApp.toLocalDate(Math.floor(Date.now()/1000), tz);
-      const end = new Date(now); end.setHours(23,59,59,999);
+      const y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
 
-      const hours = (data.hourly || [])
-        .map(h=>({
-          date: WeatherApp.toLocalDate(h.dt, tz),
-          temp: Math.round(h.temp),
-          icon: h.weather?.[0]?.icon || ''
-        }))
-        .filter(h=> h.date >= now && h.date <= end);
+      const hours = (data.list || [])
+        .map(it=>{
+          const ld = WeatherApp.toLocalDate(it.dt, tz);
+          return {
+            date: ld,
+            sameDay: (ld.getFullYear()===y && ld.getMonth()===m && ld.getDate()===d),
+            temp: Math.round(it.main.temp),
+            icon: it.weather?.[0]?.icon || ''
+          };
+        })
+        .filter(x=> x.sameDay && x.date > now);
 
-      if(hours.length){
-        this.updateHourlyForecastDisplay(hours);
-        return;
-      }
-      throw new Error('One Call sin horas restantes de hoy');
-    }catch(e){
-      // 2) fallback feed 3h
-      try{
-        const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${CONFIG.API_KEY}&units=${CONFIG.WEATHER_UNITS}&lang=${CONFIG.WEATHER_LANG}`;
-        const {data} = await axios.get(url);
-
-        const tz = data.city?.timezone ?? 0;
-        const now = WeatherApp.toLocalDate(Math.floor(Date.now()/1000), tz);
-        const y=now.getFullYear(), m=now.getMonth(), d=now.getDate();
-
-        const hours = (data.list || [])
-          .map(it=>{
-            const ld = WeatherApp.toLocalDate(it.dt, tz);
-            return {
-              date: ld,
-              sameDay: (ld.getFullYear()===y && ld.getMonth()===m && ld.getDate()===d),
-              temp: Math.round(it.main.temp),
-              icon: it.weather?.[0]?.icon || ''
-            };
-          })
-          .filter(x=> x.sameDay && x.date > now);
-
-        this.updateHourlyForecastDisplay(hours);
-      }catch(err2){
-        console.error(err2);
-        this.updateHourlyForecastDisplay([]);
-      }
+      this.updateHourlyForecastDisplay(hours);
+    }catch(err){
+      console.error(err);
+      this.updateHourlyForecastDisplay([]);
     }
   }
 

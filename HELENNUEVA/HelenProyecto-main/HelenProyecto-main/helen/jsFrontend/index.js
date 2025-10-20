@@ -6,14 +6,12 @@ $(function () {
   const weatherIcon = $('.weather-icon');   // <div class="weather-icon"> (usamos clases de Bootstrap Icons)
   const temperature = $('.temperature');    // <div class="temperature">
   const weatherDescription = $('.status');       // <div class="status">
-  const activeSensor = $('.active-sensor');
 
   // --- NUEVOS selectores para métricas extra en la tarjeta ---
   const feelsLike = $('#feels-like-value');  // <span id="feels-like-value">
   const humidityValue = $('#humidity-value');    // <span id="humidity-value">
   const windValue = $('#wind-value');        // <span id="wind-value">
   const pressureValue = $('#pressure-value');     // ✅ nuevo
-  const uvValue = $('#uv-value');          // <span id="uv-value">
 
   // =================== HORA/FECHA ===================
   const getTime = () => {
@@ -46,16 +44,16 @@ $(function () {
     locationSection.html(`${city}, ${country}`);
   };
 
-  // =================== CLIMA (OpenWeather) ===================
+  // =================== CLIMA (OpenWeather vía backend) ===================
+  const API_BASE = window.API_BASE_URL || 'http://127.0.0.1:5000';
+
   const getWeather = async () => {
     try {
-      const key = '6266f75957014a7de4ae0ded34d1e7cc';
       const lat = 32.43347;
       const lon = -116.67447;
-      const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${key}&units=metric&lang=es`;
-
-      const response = await axios.get(url);
-      const data = response.data;
+      const { data } = await axios.get(`${API_BASE}/api/weather/current`, {
+        params: { lat, lon, units: 'metric', lang: 'es' },
+      });
 
       const weatherInfo = {
         icon: data.weather[0]?.icon || '',
@@ -81,30 +79,18 @@ $(function () {
       weatherIcon.attr('class', `weather-icon bi ${biClass}`);
 
       // Pintar estado y temperatura
-      weatherDescription.html(weatherInfo.description.charAt(0).toUpperCase() + weatherInfo.description.slice(1));
+      const prettyDescription = weatherInfo.description.charAt(0).toUpperCase() + weatherInfo.description.slice(1);
+      weatherDescription.html(prettyDescription);
       temperature.html(`${weatherInfo.temperature}°C`);
 
       // --- Métricas extra (si existen los elementos en el DOM) ---
-      if (feelsLike.length) feelsLike.text(`${Math.round(data.main?.feels_like ?? weatherInfo.temperature)}°`);
-      if (humidityValue.length) humidityValue.text(`${data.main?.humidity ?? '--'}%`);
-      if (windValue.length) windValue.text(`${Math.round((data.wind?.speed ?? 0))} km/h`);
-      if (uvValue.length) uvValue.text('—'); // UV lo dejamos fijo por ahora
-      if (feelsLike.length)
-        feelsLike.text(`${Math.round(data.main?.feels_like ?? weatherInfo.temperature)}°`);
-
-      if (humidityValue.length)
-        humidityValue.text(`${data.main?.humidity ?? '--'}%`);
-
-      if (windValue.length) {
-        // OpenWeather: velocidad del viento en m/s → km/h
-        const windMs = data.wind?.speed ?? 0;
-        windValue.text(`${Math.round(windMs * 3.6)} km/h`);
-      }
-
-      // ✅ Reemplazo: Presión atmosférica en hPa (en lugar de UV)
-      const pressureValue = $('#pressure-value');
-      if (pressureValue.length)
-        pressureValue.text(`${Math.round(data.main?.pressure ?? 0)} hPa`);
+      const feelsLikeValue = Math.round(data.main?.feels_like ?? weatherInfo.temperature);
+      const humidity = data.main?.humidity ?? '--';
+      const windMs = data.wind?.speed ?? 0;
+      if (feelsLike.length) feelsLike.text(`${feelsLikeValue}°`);
+      if (humidityValue.length) humidityValue.text(`${humidity}%`);
+      if (windValue.length) windValue.text(`${Math.round(windMs * 3.6)} km/h`);
+      if (pressureValue.length) pressureValue.text(`${Math.round(data.main?.pressure ?? 0)} hPa`);
     } catch (err) {
       console.error('[getWeather] error:', err);
       weatherDescription.html('No disponible');
@@ -117,8 +103,42 @@ $(function () {
   };
 
   // =================== OTROS ===================
-  activeSensor.on('click', function () {
-    alert('Sensor activado');
+  // =================== MODAL WIFI ===================
+  const wifiModal = $('#wifi-modal');
+  const wifiButton = $('#wifi-button');
+  const closeWifiModal = $('#close-wifi-modal');
+
+  const toggleBodyScroll = (lock) => {
+    $('body').toggleClass('wifi-modal-open', !!lock);
+  };
+
+  const openWifiModal = () => {
+    if (!wifiModal.length) return;
+    wifiModal.css('display', 'grid');
+    toggleBodyScroll(true);
+    // Dispara un escaneo inicial cuando se abre desde la home
+    document.getElementById('refresh-wifi')?.click();
+  };
+
+  const hideWifiModal = () => {
+    if (!wifiModal.length) return;
+    wifiModal.css('display', 'none');
+    toggleBodyScroll(false);
+  };
+
+  wifiButton.on('click', openWifiModal);
+  closeWifiModal.on('click', hideWifiModal);
+
+  wifiModal.on('click', (event) => {
+    if (event.target === wifiModal.get(0)) {
+      hideWifiModal();
+    }
+  });
+
+  $(document).on('keydown', (event) => {
+    if (event.key === 'Escape') {
+      hideWifiModal();
+    }
   });
 
   // Lanzar iniciales

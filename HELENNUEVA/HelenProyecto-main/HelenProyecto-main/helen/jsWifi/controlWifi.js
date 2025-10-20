@@ -28,15 +28,19 @@ const connectWifiButton  = document.getElementById('connect-wifi-button');
 const connectLoader      = document.getElementById('connect-loader');
 const connectText        = document.getElementById('connect-text');
 const connectingText     = document.getElementById('connecting-text');
+const wifiStatusIcon     = document.getElementById('wifi-status-icon');
 
 const hasElectron = !!window.electronAPI;
 const hasWifiAPI  = !!(window.wifiAPI && window.wifiAPI.scanNetworks);
 
 // --------- Utilidades UI ----------
 function setScanningUI(isScanning) {
-  if (!refreshWifiButton || !scanLabel) return;
-  refreshWifiButton.classList.toggle('scanning', !!isScanning);
-  scanLabel.textContent = isScanning ? 'Buscando...' : 'Buscar Redes';
+  if (refreshWifiButton) {
+    refreshWifiButton.classList.toggle('scanning', !!isScanning);
+  }
+  if (scanLabel) {
+    scanLabel.textContent = isScanning ? 'Buscando...' : 'Buscar Redes';
+  }
 }
 
 function showPasswordPanel(show) {
@@ -69,31 +73,51 @@ function barsIconFromQuality(q) {
 
 // --------- Password toggle ----------
 togglePassword?.addEventListener('click', () => {
+  if (!passwordInput) return;
   const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
   passwordInput.setAttribute('type', type);
-  passwordToggleIcon.className = (type === 'password') ? 'bi bi-eye-slash' : 'bi bi-eye';
+  if (passwordToggleIcon) {
+    passwordToggleIcon.className = (type === 'password') ? 'bi bi-eye-slash' : 'bi bi-eye';
+  }
 });
 
 // --------- Conexión actual ----------
 async function checkCurrentConnection() {
   try {
-    if (!hasWifiAPI) return false;
+    if (!hasWifiAPI) {
+      currentConnection = null;
+      updateWifiStatusIcon();
+      return false;
+    }
     const current = await window.wifiAPI.getCurrentConnections();
     if (current && current.length) {
       currentConnection = current[0];
       localStorage.setItem('wifiConnected', 'true');
       localStorage.setItem('currentSSID', currentConnection.ssid);
+      updateWifiStatusIcon();
       return true;
     }
     currentConnection = null;
     localStorage.setItem('wifiConnected', 'false');
     localStorage.removeItem('currentSSID');
+    updateWifiStatusIcon();
     return false;
   } catch (e) {
     console.error('[WiFi] checkCurrentConnection:', e);
     currentConnection = null;
+    updateWifiStatusIcon();
     return false;
   }
+}
+
+function updateWifiStatusIcon() {
+  if (!wifiStatusIcon) return;
+  const isConnected = !!(currentConnection && currentConnection.ssid);
+  wifiStatusIcon.classList.toggle('bi-wifi', isConnected);
+  wifiStatusIcon.classList.toggle('bi-wifi-off', !isConnected);
+  wifiStatusIcon.title = isConnected
+    ? `Conectado a ${currentConnection.ssid}`
+    : 'Sin conexión WiFi';
 }
 
 // --------- Render de red ----------
@@ -121,7 +145,8 @@ function renderNetworkItem(network, isActive) {
 
   li.addEventListener('click', () => {
     // selección visual
-    document.querySelectorAll('.wifi-item.selected').forEach(el => el.classList.remove('selected'));
+    const scope = wifiList || document;
+    scope.querySelectorAll('.wifi-item.selected').forEach(el => el.classList.remove('selected'));
     li.classList.add('selected');
 
     // estado
@@ -131,11 +156,11 @@ function renderNetworkItem(network, isActive) {
       security: network.security
     };
 
-    connectWifiButton.disabled = false;
+    if (connectWifiButton) connectWifiButton.disabled = false;
     showPasswordPanel(secure);
 
     const isCurrent = !!(currentConnection && currentConnection.ssid === network.ssid);
-    connectText.textContent = isCurrent ? 'Reconectar' : 'Conectar';
+    if (connectText) connectText.textContent = isCurrent ? 'Reconectar' : 'Conectar';
   });
 
   return li;
@@ -146,12 +171,12 @@ async function scanNetworks() {
   try {
     setScanningUI(true);
     selectedNetwork = null;
-    connectWifiButton.disabled = true;
+    if (connectWifiButton) connectWifiButton.disabled = true;
     showPasswordPanel(false);
-    passwordInput.value = '';
+    if (passwordInput) passwordInput.value = '';
 
-    wifiList.innerHTML = '';
-    networksEmpty.style.display = 'flex';
+    if (wifiList) wifiList.innerHTML = '';
+    if (networksEmpty) networksEmpty.style.display = 'flex';
 
     if (!hasWifiAPI) {
       // DEMO (cuando se abre en navegador sin backend)
@@ -172,28 +197,39 @@ async function scanNetworks() {
       security: n.security
     }));
 
-    if (currentConnection?.ssid) {
-      networks.sort((a, b) => (a.ssid === currentConnection.ssid ? -1 : b.ssid === currentConnection.ssid ? 1 : 0));
-    }
-    networks.sort((a, b) => b.quality - a.quality);
+    networks.sort((a, b) => {
+      if (currentConnection?.ssid) {
+        if (a.ssid === currentConnection.ssid) return -1;
+        if (b.ssid === currentConnection.ssid) return 1;
+      }
+      return (b.quality ?? 0) - (a.quality ?? 0);
+    });
 
-    wifiList.innerHTML = '';
+    if (wifiList) wifiList.innerHTML = '';
     if (!networks.length) {
-      networksEmpty.style.display = 'flex';
-      networksEmpty.querySelector('p').textContent = 'No se encontraron redes';
+      if (networksEmpty) {
+        networksEmpty.style.display = 'flex';
+        const label = networksEmpty.querySelector('p');
+        if (label) label.textContent = 'No se encontraron redes';
+      }
       return;
     }
 
-    networksEmpty.style.display = 'none';
-    networks.forEach(net => {
-      const isActive = !!(currentConnection && currentConnection.ssid === net.ssid);
-      wifiList.appendChild(renderNetworkItem(net, isActive));
-    });
+    if (networksEmpty) networksEmpty.style.display = 'none';
+    if (wifiList) {
+      networks.forEach(net => {
+        const isActive = !!(currentConnection && currentConnection.ssid === net.ssid);
+        wifiList.appendChild(renderNetworkItem(net, isActive));
+      });
+    }
   } catch (err) {
     console.error('[WiFi] scanNetworks:', err);
-    wifiList.innerHTML = '';
-    networksEmpty.style.display = 'flex';
-    networksEmpty.querySelector('p').textContent = 'Error al buscar redes';
+    if (wifiList) wifiList.innerHTML = '';
+    if (networksEmpty) {
+      networksEmpty.style.display = 'flex';
+      const label = networksEmpty.querySelector('p');
+      if (label) label.textContent = 'Error al buscar redes';
+    }
   } finally {
     setScanningUI(false);
   }
@@ -204,14 +240,14 @@ async function connectToNetwork() {
   if (!selectedNetwork || !hasWifiAPI) return;
 
   // Loading UI
-  connectLoader.style.display = 'inline-block';
-  connectText.style.display = 'none';
-  connectingText.style.display = 'inline';
-  connectWifiButton.disabled = true;
+  if (connectLoader) connectLoader.style.display = 'inline-block';
+  if (connectText) connectText.style.display = 'none';
+  if (connectingText) connectingText.style.display = 'inline';
+  if (connectWifiButton) connectWifiButton.disabled = true;
 
   try {
     const secure = isSecure(selectedNetwork);
-    const password = secure ? (passwordInput.value || '') : undefined;
+    const password = secure ? (passwordInput?.value || '') : undefined;
 
     // ¿Se cambia de red?
     const current = await window.wifiAPI.getCurrentConnections();
@@ -256,10 +292,10 @@ async function connectToNetwork() {
     });
   } finally {
     // Restablecer UI del botón
-    connectLoader.style.display = 'none';
-    connectText.style.display = 'inline';
-    connectingText.style.display = 'none';
-    connectWifiButton.disabled = false;
+    if (connectLoader) connectLoader.style.display = 'none';
+    if (connectText) connectText.style.display = 'inline';
+    if (connectingText) connectingText.style.display = 'none';
+    if (connectWifiButton) connectWifiButton.disabled = false;
   }
 }
 
@@ -267,15 +303,20 @@ async function connectToNetwork() {
 if (hasElectron && window.electronAPI?.onWifiStatusChange) {
   window.electronAPI.onWifiStatusChange((event, data) => {
     currentConnection = data?.currentConnection || null;
+    updateWifiStatusIcon();
     // Si quieres refrescar automáticamente al cambiar estado del SO:
     // scanNetworks();
   });
 }
 
+updateWifiStatusIcon();
+
 // --------- Arranque ----------
 document.addEventListener('DOMContentLoaded', async () => {
   await checkCurrentConnection();
-  await scanNetworks();
+  if (wifiList) {
+    await scanNetworks();
+  }
 });
 
 // --------- Listeners ----------

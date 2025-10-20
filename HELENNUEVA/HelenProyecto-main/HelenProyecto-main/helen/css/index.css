@@ -314,11 +314,33 @@ body{
   padding:10px 14px; color:#fff; cursor:pointer;
   background: rgba(255,255,255,.08);
   transition: background-color var(--t-fast) ease, transform var(--t-fast) ease;
+  display:inline-flex; align-items:center; gap:8px;
 }
 @media (hover: hover){
   .refresh-button:hover{ background: rgba(255,255,255,.14); transform: translateY(-1px) }
 }
 .refresh-button i{ font-size: 16px }
+.refresh-button.scanning i{ animation: wifi-spin 1s linear infinite }
+.refresh-button #scan-label{ font-size:14px; font-weight:500 }
+
+@keyframes wifi-spin{ from{ transform: rotate(0deg) } to{ transform: rotate(360deg) } }
+
+.networks-empty{
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:12px;
+  padding:18px 14px;
+  margin-bottom:12px;
+  border-radius: var(--r-sm);
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color: var(--fg-soft);
+  text-align:center;
+}
+.networks-empty .empty-icon{ font-size:28px; color:#7db2ff }
+.networks-empty p{ margin:0; font-size:14px }
 
 .wifi-list{
   background: rgba(255,255,255,.04);
@@ -434,3 +456,5 @@ html, body {
   text-align: center;
   margin-bottom: 1rem;
 }
+
+body.wifi-modal-open{ overflow:hidden }
