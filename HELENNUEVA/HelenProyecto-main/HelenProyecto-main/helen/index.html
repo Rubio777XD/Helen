@@ -68,15 +68,17 @@
                 </div> -->
                 <button class="refresh-button" id="refresh-wifi">
                     <i class="bi bi-arrow-clockwise"></i>
+                    <span id="scan-label">Buscar Redes</span>
                 </button>
+            </div>
+
+            <div class="networks-empty" id="networks-empty">
+                <div class="empty-icon"><i class="bi bi-wifi"></i></div>
+                <p>Buscando redes disponibles...</p>
             </div>
 
             <div class="wifi-list" id="wifi-list">
                 <!-- Las redes WiFi se cargarán aquí dinámicamente -->
-                <div class="wifi-item">
-                    <div class="wifi-signal"><i class="bi bi-wifi"></i></div>
-                    <div class="wifi-name">Cargando redes disponibles...</div>
-                </div>
             </div>
 
             <div class="password-input-container" id="password-container">
@@ -201,6 +203,7 @@
         window.io = window.io || null;
     </script>
 
+    <script src="./jsFrontend/apiConfig.js"></script>
     <script src="./jsWifi/controlWifi.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="./jsFrontend/index.js"></script>
@@ -208,7 +211,7 @@
     <script src="./jsSignHandler/eventConnector.js"></script>
     <script src="./jsSignHandler/actions.js"></script>
     <script src="./jsSignHandler/loadingScreenLoader.js"></script>
-    <script src="../pages/jsFrontend/alarm-core.js" defer></script>
+    <script src="./pages/jsFrontend/alarm-core.js" defer></script>
 
 
 </body>

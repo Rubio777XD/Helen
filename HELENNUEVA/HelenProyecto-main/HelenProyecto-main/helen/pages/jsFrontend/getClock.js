@@ -12,8 +12,9 @@ const ZONAS_HORARIAS = {
 const CONFIG = {
   STORAGE_KEY: "selectedCity",
   DEFAULT_CITY: "tijuana",
-  TIMEZONEDB_API_KEY: "SJABR4Q4XL7D", 
 };
+
+const API_BASE = window.API_BASE_URL || 'http://127.0.0.1:5000';
 
 let ultimaHoraObtenida = null;
 let ultimaFechaObtenida = null;
@@ -21,15 +22,15 @@ let formato24Horas = true; // Por defecto, formato 24h
 
 
 /**
- * Obtiene la hora local desde la API de TimeZoneDB con reintentos en caso de error.
+ * Obtiene la hora local desde el backend Flask con reintentos en caso de error.
  * @param {string} timezone - Zona horaria.
  * @param {number} retries - Número de reintentos.
  * @param {number} delay - Tiempo de espera entre reintentos en milisegundos.
  */
-async function obtenerHoraLocalTimeZoneDB(timezone, retries = 5, delay = 2000) {
+async function obtenerHoraLocal(timezone, retries = 5, delay = 2000) {
   try {
     const response = await fetch(
-      `https://api.timezonedb.com/v2.1/get-time-zone?key=${CONFIG.TIMEZONEDB_API_KEY}&format=json&by=zone&zone=${timezone}`
+      `${API_BASE}/api/time?timezone=${encodeURIComponent(timezone)}`
     );
 
     if (!response.ok) {
@@ -37,14 +38,18 @@ async function obtenerHoraLocalTimeZoneDB(timezone, retries = 5, delay = 2000) {
     }
 
     const data = await response.json();
+    if (!data?.date || !data?.time) {
+      throw new Error('Respuesta inválida del backend');
+    }
+
     return {
-      horaLocal: data.formatted, // Hora en formato ISO (ejemplo: "2024-05-09 22:12:00")
+      horaLocal: `${data.date} ${data.time}`,
     };
   } catch (error) {
     if (retries > 0) {
       console.warn(`Error al obtener la hora. Reintentando en ${delay / 1000} segundos...`);
       await new Promise((resolve) => setTimeout(resolve, delay)); // Espera antes de reintentar
-      return obtenerHoraLocalTimeZoneDB(timezone, retries - 1, delay); // Reintenta
+      return obtenerHoraLocal(timezone, retries - 1, delay); // Reintenta
     } else {
       throw new Error(`Error después de varios intentos: ${error.message}`);
     }
@@ -141,8 +146,8 @@ async function actualizarHoraLocal() {
   const timezone = ZONAS_HORARIAS[municipioKey];
 
   try {
-    // Obtiene la hora local desde la API de TimeZoneDB con reintentos
-    const resultado = await obtenerHoraLocalTimeZoneDB(timezone);
+    // Obtiene la hora local desde el backend (con reintentos automáticos)
+    const resultado = await obtenerHoraLocal(timezone);
 
     // Extrae la hora y la fecha de la respuesta
     ultimaHoraObtenida = extraerHora(resultado.horaLocal);
